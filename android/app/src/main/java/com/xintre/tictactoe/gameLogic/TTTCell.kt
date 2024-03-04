@@ -10,6 +10,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -21,6 +24,7 @@ import com.xintre.tictactoe.ui.theme.InactiveCellBgColor
 import com.xintre.tictactoe.ui.theme.WinningCellBgColor
 
 
+@Suppress("LongParameterList", "FunctionNaming")
 @Composable
 fun TTTCell(
     vibrator: Vibrator?,
@@ -28,7 +32,7 @@ fun TTTCell(
     state: TTTCellState,
     cellSizeDp: Int,
     mutateCellState: (newCellState: TTTCellState) -> Unit,
-    whoseTurn: UserTurn,
+    whoseTurn: MutableState<UserTurn>,
     isWinningCell: Boolean
 ) {
     val isCellEmpty = state == TTTCellState.EMPTY
@@ -53,7 +57,7 @@ fun TTTCell(
                 modifier = Modifier.align(alignment = Alignment.Center),
                 onClick = {
                     if (isCellEmpty && !isGameFinished) {
-                        mutateCellState(whoseTurn.getUsersCellState())
+                        mutateCellState(whoseTurn.value.getUsersCellState())
                         vibrator?.vibrate(200)
                     }
                 },
@@ -70,13 +74,15 @@ fun TTTCell(
 @Preview
 @Composable
 fun TTTCellPreview() {
+    val whoseTurn = remember { mutableStateOf(UserTurn.USER_1) }
+
     return TTTCell(
         vibrator = null,
         gameState = TTTGameState.PLAYING,
         state = TTTCellState.CROSS,
         cellSizeDp = 60,
         mutateCellState = {},
-        whoseTurn = UserTurn.USER_1,
+        whoseTurn = whoseTurn,
         isWinningCell = true
     )
 }

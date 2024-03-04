@@ -4,18 +4,22 @@ import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
 import android.os.Vibrator
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +42,8 @@ import com.xintre.tictactoe.gameLogic.getUsersCellState
 import com.xintre.tictactoe.ui.Constants
 import java.util.Locale
 
+const val LOG_TAG = "TTTGameScreen"
+
 fun <T> prepareTTTGrid(
     mapSize: Int,
     renderCell: (row: Int, col: Int) -> T
@@ -49,18 +55,20 @@ fun <T> prepareTTTGrid(
     }
 }
 
+fun createEmptyMap(mapSize: Int): SnapshotStateList<SnapshotStateList<TTTCellState>> {
+    return ((prepareTTTGrid(mapSize) { _, _ ->
+        TTTCellState.EMPTY
+    }).map { rowList ->
+        rowList.toMutableStateList()
+    }).toMutableStateList()
+}
+
 @Composable
 fun TTTGameScreen(mapSize: Int) {
     val context = LocalContext.current.applicationContext
     val configuration = LocalConfiguration.current
-    val mapState = remember {
-        ((prepareTTTGrid(mapSize) { _, _ ->
-            TTTCellState.EMPTY
-        }).map { rowList ->
-            rowList.toMutableStateList()
-        }).toMutableStateList()
-    }
-    var whoseTurn by remember { mutableStateOf(UserTurn.USER_1) }
+    val mapState = remember { createEmptyMap(mapSize) }
+    val whoseTurn = remember { mutableStateOf(UserTurn.USER_1) }
     var gameState by remember { mutableStateOf(TTTGameState.PLAYING) }
     var gameWinner by remember { mutableStateOf<UserTurn?>(null) }
     var winningIndices by remember { mutableStateOf(listOf<TTTCellCoordinates>()) }
@@ -68,6 +76,7 @@ fun TTTGameScreen(mapSize: Int) {
         LocalContext.current.applicationContext,
         Vibrator::class.java
     )
+    var cellInteractionHappenedOnThisRecompose = remember { mutableStateOf(false) }
 
     val screenRowSize =
         if (configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
@@ -137,23 +146,27 @@ fun TTTGameScreen(mapSize: Int) {
 
         // check if any diagonal is complete
         var leftDiagonalComplete = true
+        val winningDiagLIndices = mutableListOf<TTTCellCoordinates>()
         leftDiagonalLoop@ for (i in 0..<mapSize) {
+            var areAllColumnsInThisDiagEqual = true
             val cell = mapState[i][i]
             if (cell != mapState[0][0] || cell == TTTCellState.EMPTY) {
                 leftDiagonalComplete = false
+                winningDiagLIndices.clear()
                 break
+            } else {
+                winningDiagLIndices.add(TTTCellCoordinates(row = i, col = i))
             }
-            if (areAllColumnsInThisRowEqual) {
-                anyRowComplete = true
-                allWinningIndices.addAll(winningRowIndices)
-                break@rowLoop
-            }
+        }
+        if (leftDiagonalComplete) {
+            allWinningIndices.addAll(winningDiagLIndices)
         }
 
         var rightDiagonalComplete = true
+        val winningDiagRIndicies = mutableListOf<TTTCellCoordinates>()
         val rightDiagRowIndicesToLoop = (0..<mapSize).toList()
         val rightDiagColIndicesToLoop = rightDiagRowIndicesToLoop.reversed()
-        for (i in 0..<mapSize) {
+        rightDiagonalLoop@ for (i in 0..<mapSize) {
             val rowIndex = rightDiagRowIndicesToLoop[i]
             val colIndex = rightDiagColIndicesToLoop[i]
             // the first cell
@@ -162,8 +175,14 @@ fun TTTGameScreen(mapSize: Int) {
             val cell = mapState[rowIndex][colIndex]
             if (cell != referenceCell || cell == TTTCellState.EMPTY) {
                 rightDiagonalComplete = false
-                break
+                winningDiagRIndicies.clear()
+                break@rightDiagonalLoop
+            } else {
+                winningDiagRIndicies.add(TTTCellCoordinates(row = rowIndex, col = colIndex))
             }
+        }
+        if (rightDiagonalComplete) {
+            allWinningIndices.addAll(winningDiagRIndicies)
         }
 
         // check if we have a winner or the game is over with a draw
@@ -184,6 +203,8 @@ fun TTTGameScreen(mapSize: Int) {
                     vibrator?.vibrate(200)
                 }, 200)
             }, 400)
+
+            Log.d(LOG_TAG, "Winning indicies: $winningIndices")
 
             Toast.makeText(
                 context,
@@ -213,7 +234,7 @@ fun TTTGameScreen(mapSize: Int) {
     }
 
     val banner = if (gameState == TTTGameState.PLAYING)
-        "It's ${whoseTurn.getUserName()}'s turn"
+        "It's ${whoseTurn.value.getUserName()}'s turn"
     else when (gameWinner) {
         null -> "The game was a draw \uD83E\uDD1D"
         else -> "\uD83C\uDFC6 ${
@@ -241,7 +262,7 @@ fun TTTGameScreen(mapSize: Int) {
             Row {
                 Text(
                     text = "Let's make ${
-                        whoseTurn.getUsersCellState().getUserSymbol()
+                        whoseTurn.value.getUsersCellState().getUserSymbol()
                     }s rain! \uD83D\uDCA7☔",
                     modifier = Modifier
                         .fillMaxWidth()
@@ -249,6 +270,41 @@ fun TTTGameScreen(mapSize: Int) {
                     fontSize = 15.sp,
                     textAlign = TextAlign.Center
                 )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            ElevatedButton(
+                onClick = {
+                    mapState.forEach {
+                        it.fill(TTTCellState.EMPTY)
+                    }
+
+                    whoseTurn.value = UserTurn.USER_1
+                    winningIndices = listOf()
+                    gameState = TTTGameState.PLAYING
+                },
+                shape = CircleShape,
+                //colors = ButtonDefaults.buttonColors(ActiveCellBgColor),
+                modifier = Modifier
+                    .padding(0.dp, 0.dp, 0.dp, 30.dp)
+                    .align(Alignment.CenterVertically)
+            ) {
+                Text("Replay \uD83D\uDD04")
+            }
+
+            ElevatedButton(
+                onClick = { /*TODO*/ },
+                shape = CircleShape,
+                //colors = ButtonDefaults.buttonColors(ActiveCellBgColor),
+                modifier = Modifier
+                    .padding(0.dp, 0.dp, 0.dp, 30.dp)
+                    .align(Alignment.CenterVertically)
+            ) {
+                Text("Back to menu \uD83D\uDCCB")
             }
         }
 
@@ -277,8 +333,7 @@ fun TTTGameScreen(mapSize: Int) {
                         isWinningCell = isWinningCell,
                         mutateCellState = { newCellState ->
                             mapState[row][col] = newCellState
-
-                            whoseTurn = when (whoseTurn) {
+                            whoseTurn.value = when (whoseTurn.value) {
                                 UserTurn.USER_1 -> UserTurn.USER_2
                                 UserTurn.USER_2 -> UserTurn.USER_1
                             }
