@@ -2,6 +2,10 @@
 
 A Jetpack Compose Android Tic-Tac-Toe game written in Kotlin.
 
+<p align="center">
+  <img src="./images/multiple_wins_map_5x5.gif" width="30%">
+<p/>
+
 ## Table of contents
 
 - [Tic-Tac-Toe Android App](#tic-tac-toe-android-app)
@@ -9,8 +13,6 @@ A Jetpack Compose Android Tic-Tac-Toe game written in Kotlin.
   - [Features](#features)
   - [Demo](#demo)
   - [APK Download](#apk-download)
-
-
 
 ## Features
 
@@ -22,9 +24,10 @@ A Jetpack Compose Android Tic-Tac-Toe game written in Kotlin.
 
 ## Demo
 
-| <div style="width:10vw">Map size validation</div> | <div style="width:10vw">Winning with a single pattern</div> | <div style="width:10vw">Winning with multiple patterns</div> | <div style="width:10vw">Replay button</div> | <div style="width:10vw">Multiple screen orientations support</div> |
-| ------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------- | ------------------------------------------------------------------ |
-| <img src="./images/mapsize_validation.gif">       | <img src="./images/winning_map_3x3.gif">                    | <img src="./images/multiple_wins_map_5x5.gif">               | <img src="./images/replay_and_a_draw.gif">  | <img src="./images/orientation_change.gif">                        |
+
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Map&nbsp;size&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br/>validation | &nbsp;&nbsp;Winning&nbsp;with&nbsp;&nbsp;&nbsp;<br/>a single pattern | &nbsp;&nbsp;Winning&nbsp;with&nbsp;&nbsp;&nbsp;<br/>multiple patterns | &nbsp;&nbsp;Replay&nbsp;button&nbsp;&nbsp; | &nbsp;Multiple&nbsp;screen<br/> orientations support |
+| :---:| :---: | :---: | :----: | :---: |
+| <img style="width:120px" src="./images/mapsize_validation.gif">       | <img style="width:120px" src="./images/winning_map_3x3.gif">                    | <img style="width:120px" src="./images/multiple_wins_map_5x5.gif">               | <img style="width:120px" src="./images/replay_and_a_draw.gif">  | <img style="width:120px" src="./images/orientation_change.gif">                        |
 
 ## APK Download
 
