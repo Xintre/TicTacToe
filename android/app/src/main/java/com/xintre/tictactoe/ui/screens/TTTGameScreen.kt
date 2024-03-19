@@ -1,6 +1,5 @@
 package com.xintre.tictactoe.ui.screens
 
-import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
 import android.os.Vibrator
@@ -9,21 +8,26 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -40,7 +44,9 @@ import com.xintre.tictactoe.gameLogic.getUserName
 import com.xintre.tictactoe.gameLogic.getUserSymbol
 import com.xintre.tictactoe.gameLogic.getUsersCellState
 import com.xintre.tictactoe.ui.Constants
+import com.xintre.tictactoe.ui.pxToDp
 import java.util.Locale
+
 
 const val LOG_TAG = "TTTGameScreen"
 
@@ -64,27 +70,48 @@ fun createEmptyMap(mapSize: Int): SnapshotStateList<SnapshotStateList<TTTCellSta
 }
 
 @Composable
-fun TTTGameScreen(mapSize: Int) {
+fun TTTGameScreen(mapSize: Int, openMenuScreen: () -> Unit) {
     val context = LocalContext.current.applicationContext
-    val configuration = LocalConfiguration.current
-    val mapState = remember { createEmptyMap(mapSize) }
-    val whoseTurn = remember { mutableStateOf(UserTurn.USER_1) }
-    var gameState by remember { mutableStateOf(TTTGameState.PLAYING) }
-    var gameWinner by remember { mutableStateOf<UserTurn?>(null) }
-    var winningIndices by remember { mutableStateOf(listOf<TTTCellCoordinates>()) }
+    val mapState = rememberSaveable(
+        key = "mapState", saver = listSaver(
+            save = { stateList ->
+                stateList.flatMap {
+                    it.toList()
+                }.toList()
+            },
+            restore = { flattened ->
+                val reconstruction = mutableListOf<List<TTTCellState>>()
+
+                var i = 0
+                while (i < flattened.size) {
+                    reconstruction.add(flattened.subList(i, i + mapSize))
+                    i += mapSize
+                }
+
+                reconstruction.map { row ->
+                    row.toMutableStateList()
+                }.toMutableStateList()
+            }
+        )
+    ) { createEmptyMap(mapSize) }
+    val whoseTurn = rememberSaveable(key = "whoseTurn") { mutableStateOf(UserTurn.USER_1) }
+    var gameState by rememberSaveable(key = "gameState") { mutableStateOf(TTTGameState.PLAYING) }
+    var gameWinner by rememberSaveable(key = "gameWinner") { mutableStateOf<UserTurn?>(null) }
+    var menuSizeDp by remember { mutableFloatStateOf(0f) }
+    var rootContainerWidthDp by remember { mutableFloatStateOf(0f) }
+    var rootContainerHeightDp by remember { mutableFloatStateOf(0f) }
+    var winningIndices by rememberSaveable(key = "winningIndices") { mutableStateOf(listOf<TTTCellCoordinates>()) }
     val vibrator = ContextCompat.getSystemService(
         LocalContext.current.applicationContext,
         Vibrator::class.java
     )
-    var cellInteractionHappenedOnThisRecompose = remember { mutableStateOf(false) }
 
-    val screenRowSize =
-        if (configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
-            configuration.screenWidthDp
-        else
-            configuration.screenHeightDp
-
-    val cellSizeDp = screenRowSize / mapSize - Constants.TTT_CELL_MARGIN_DP * 2
+    val cellSizeDp = Math.min(
+        // by width
+        rootContainerWidthDp.toFloat() / mapSize.toFloat() - Constants.TTT_CELL_MARGIN_DP * 2,
+        // by height
+        (rootContainerHeightDp - menuSizeDp).toFloat() / mapSize.toFloat() - Constants.TTT_CELL_MARGIN_DP * 2
+    )
 
     fun finishGameIfApplicable() {
         val allWinningIndices =
@@ -245,66 +272,93 @@ fun TTTGameScreen(mapSize: Int) {
 
     return Column(
         verticalArrangement = Arrangement.Center,
-    ) {
-        Row {
-            Text(
-                text = banner,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(0.dp, 10.dp),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-        }
+        modifier = Modifier
+            .fillMaxSize()
+            .onGloballyPositioned {
+                rootContainerWidthDp = pxToDp(
+                    it.size.width,
+                    context
+                )
 
-        if (gameState == TTTGameState.PLAYING) {
+                rootContainerHeightDp = pxToDp(
+                    it.size.height,
+                    context
+                )
+            }
+    ) {
+        Column(
+            modifier = Modifier
+                .onGloballyPositioned {
+                    menuSizeDp = pxToDp(
+                        it.size.height,
+                        context
+                    )
+                }
+                .fillMaxWidth()
+                .wrapContentHeight(Alignment.CenterVertically)
+        ) {
             Row {
                 Text(
-                    text = "Let's make ${
-                        whoseTurn.value.getUsersCellState().getUserSymbol()
-                    }s rain! \uD83D\uDCA7☔",
+                    text = banner,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(0.dp, 10.dp, 0.dp, 30.dp),
-                    fontSize = 15.sp,
+                        .padding(0.dp, 10.dp),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
             }
-        }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            ElevatedButton(
-                onClick = {
-                    mapState.forEach {
-                        it.fill(TTTCellState.EMPTY)
-                    }
-
-                    whoseTurn.value = UserTurn.USER_1
-                    winningIndices = listOf()
-                    gameState = TTTGameState.PLAYING
-                },
-                shape = CircleShape,
-                //colors = ButtonDefaults.buttonColors(ActiveCellBgColor),
-                modifier = Modifier
-                    .padding(0.dp, 0.dp, 0.dp, 30.dp)
-                    .align(Alignment.CenterVertically)
-            ) {
-                Text("Replay \uD83D\uDD04")
+            if (gameState == TTTGameState.PLAYING) {
+                Row {
+                    Text(
+                        text = "Let's make ${
+                            whoseTurn.value.getUsersCellState().getUserSymbol()
+                        }s rain! \uD83D\uDCA7☔",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(0.dp, 10.dp, 0.dp, 30.dp),
+                        fontSize = 15.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
-            ElevatedButton(
-                onClick = { /*TODO*/ },
-                shape = CircleShape,
-                //colors = ButtonDefaults.buttonColors(ActiveCellBgColor),
-                modifier = Modifier
-                    .padding(0.dp, 0.dp, 0.dp, 30.dp)
-                    .align(Alignment.CenterVertically)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
             ) {
-                Text("Back to menu \uD83D\uDCCB")
+                ElevatedButton(
+                    onClick = {
+                        mapState.forEach {
+                            it.fill(TTTCellState.EMPTY)
+                        }
+
+                        whoseTurn.value = UserTurn.USER_1
+                        winningIndices = listOf()
+                        gameState = TTTGameState.PLAYING
+                    },
+                    shape = CircleShape,
+                    //colors = ButtonDefaults.buttonColors(ActiveCellBgColor),
+                    modifier = Modifier
+                        .padding(0.dp, 0.dp, 0.dp, 30.dp)
+                        .align(Alignment.CenterVertically)
+                ) {
+                    Text("Replay \uD83D\uDD04")
+                }
+
+                ElevatedButton(
+                    onClick = {
+                        openMenuScreen()
+                    },
+                    shape = CircleShape,
+                    //colors = ButtonDefaults.buttonColors(ActiveCellBgColor),
+                    modifier = Modifier
+                        .padding(0.dp, 0.dp, 0.dp, 30.dp)
+                        .align(Alignment.CenterVertically)
+                ) {
+                    Text("Back to menu \uD83D\uDCCB")
+                }
             }
         }
 
@@ -350,5 +404,5 @@ fun TTTGameScreen(mapSize: Int) {
 @Preview
 @Composable
 fun TTTGamePreview() {
-    TTTGameScreen(mapSize = 4)
+    TTTGameScreen(mapSize = 4, openMenuScreen = {})
 }

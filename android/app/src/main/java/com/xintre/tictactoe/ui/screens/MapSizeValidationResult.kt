@@ -10,7 +10,8 @@ import androidx.compose.runtime.MutableState
  */
 class MapSizeValidationResult private constructor(
     val errorToShowOnUI: String?,
-    val isTrulyValid: Boolean
+    val isTrulyValid: Boolean,
+    val mapSizeInt: Int?
 ) {
     fun shouldShowErrorOnUI(): Boolean {
         return errorToShowOnUI != null
@@ -26,19 +27,19 @@ class MapSizeValidationResult private constructor(
         fun validateMapSize(mapSizeStr: MutableState<String>): MapSizeValidationResult {
             // edge case: when string empty, don't show the error
             if (mapSizeStr.value.isEmpty()) {
-                return MapSizeValidationResult(null, false)
+                return MapSizeValidationResult(null, false, null)
             }
 
             return try {
                 val mapSizeInt = Integer.parseInt(mapSizeStr.value)
 
                 if (mapSizeInt < 2) {
-                    MapSizeValidationResult("Map size must be > 1", false)
+                    MapSizeValidationResult("Map size must be > 1", false, null)
                 } else {
-                    MapSizeValidationResult(null, true)
+                    MapSizeValidationResult(null, true, mapSizeInt)
                 }
             } catch (error: NumberFormatException) {
-                MapSizeValidationResult("Invalid number", false)
+                MapSizeValidationResult("Invalid number", false, null)
             }
         }
     }
